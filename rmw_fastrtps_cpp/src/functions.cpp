@@ -1177,9 +1177,9 @@ fail:
             info->request_type_support_->deleteData(request.buffer_);
 
             *taken = true;
+            return RMW_RET_OK;
         }
-
-        return RMW_RET_OK;
+        return RMW_RET_ERROR;
     }
 
     rmw_ret_t rmw_take_response(const rmw_client_t *client,
@@ -1216,9 +1216,9 @@ fail:
             *taken = true;
 
             info->request_type_support_->deleteData(response.buffer_);
+            return RMW_RET_OK;
         }
-
-        return RMW_RET_OK;
+        return RMW_RET_ERROR;
     }
 
     rmw_ret_t rmw_send_response(const rmw_service_t *service,
@@ -1259,10 +1259,11 @@ fail:
                 RMW_SET_ERROR_MSG("cannot publish data");
 
             info->response_type_support_->deleteData(buffer);
+            return returnedValue;
         }
 
 
-        return returnedValue;
+        return RMW_RET_ERROR;
     }
 
     rmw_service_t *rmw_create_service(const rmw_node_t *node,
