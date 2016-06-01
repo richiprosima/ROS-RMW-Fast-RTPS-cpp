@@ -50,6 +50,30 @@ typedef struct CustomClientResponse
     CustomClientResponse() : buffer_(nullptr) {}
 } CustomClientResponse;
 
+class DCPSPublicationListener : public SubscriberListener
+{
+public:
+  explicit DCPSPublicationListener(const rmw_guard_condition_t * graph_guard_condition)
+  : graph_guard_condition_(graph_guard_condition)
+  {}
+
+  void
+  onNewDataMessage(Subscriber * subscriber)
+  {
+    assert(subscriber);
+    void * data = nullptr;
+    eprosima::fastrtps::SampleInfo_t sinfo;
+    bool ret = subscriber->takeNextData(data, &sinfo);
+    if (!ret) {
+      fprintf(stderr, "failed to take data from publication listener\n");
+      return;
+    }
+  }
+
+private:
+  const rmw_guard_condition_t * graph_guard_condition_;
+};
+
 class ClientListener : public SubscriberListener
 {
     public:
