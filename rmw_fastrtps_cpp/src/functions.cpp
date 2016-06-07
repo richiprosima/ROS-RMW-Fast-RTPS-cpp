@@ -2047,6 +2047,7 @@ fail:
             }
         }
 
+        bool timeout = false;
         if(hasToWait)
         {
             if(!wait_timeout)
@@ -2055,14 +2056,18 @@ fail:
             {
                 std::chrono::nanoseconds n(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::seconds(wait_timeout->sec)));
                 n += std::chrono::nanoseconds(wait_timeout->nsec);
-                conditionVariable->wait_for(lock, n);
+                if (conditionVariable->wait_for(lock, n) == std::cv_status::timeout) {
+                  timeout = true;
+                }
             }
         }
+        bool hasData = true;
 
         for(unsigned long i = 0; i < subscriptions->subscriber_count; ++i)
         {
             void *data = subscriptions->subscribers[i];
             CustomSubscriberInfo *custom_subscriber_info = (CustomSubscriberInfo*)data;
+            hasData &= custom_subscriber_info->listener_->hasData();
             if(!custom_subscriber_info->listener_->hasData())
             {
                 subscriptions->subscribers[i] = 0;
@@ -2076,6 +2081,7 @@ fail:
         {
             void *data = clients->clients[i];
             CustomClientInfo *custom_client_info = (CustomClientInfo*)data;
+            hasData &= custom_client_info->listener_->hasData();
             if(!custom_client_info->listener_->hasData())
             {
                 clients->clients[i] = 0;
@@ -2089,6 +2095,7 @@ fail:
         {
             void *data = services->services[i];
             CustomServiceInfo *custom_service_info = (CustomServiceInfo*)data;
+            hasData &= custom_service_info->listener_->hasData();
             if(!custom_service_info->listener_->hasData())
             {
                 services->services[i] = 0;
@@ -2107,13 +2114,17 @@ fail:
                 if (!guard_condition->getHasTriggered()) {
                     guard_conditions->guard_conditions[i] = 0;
                 }
+                hasData &= !(guard_conditions->guard_conditions[i] == 0);
                 lock.unlock();
                 guard_condition->dettachCondition();
                 lock.lock();
             }
         }
+        if (!hasData && wait_timeout->sec == 0 && wait_timeout->nsec == 0) {
+          return RMW_RET_TIMEOUT;
+        }
 
-        return RMW_RET_OK;
+        return timeout ? RMW_RET_TIMEOUT : RMW_RET_OK;
     }
 
     rmw_ret_t
