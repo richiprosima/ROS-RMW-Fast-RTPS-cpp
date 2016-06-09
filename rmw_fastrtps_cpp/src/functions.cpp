@@ -911,7 +911,6 @@ fail:
 
         private:
 
-            CustomSubscriberInfo *info_;
             std::mutex internalMutex_;
             uint32_t data_;
             std::mutex *conditionMutex_;
