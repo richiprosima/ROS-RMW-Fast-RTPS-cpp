@@ -2120,7 +2120,7 @@ fail:
                 lock.lock();
             }
         }
-        if (!hasData && wait_timeout->sec == 0 && wait_timeout->nsec == 0) {
+        if (!hasData && wait_timeout && wait_timeout->sec == 0 && wait_timeout->nsec == 0) {
           return RMW_RET_TIMEOUT;
         }
 
