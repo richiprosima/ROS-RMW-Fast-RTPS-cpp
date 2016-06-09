@@ -850,8 +850,11 @@ fail:
     {
         public:
 
-            SubListener(CustomSubscriberInfo *info) : info_(info), data_(0),
-            conditionMutex_(NULL), conditionVariable_(NULL) {}
+            SubListener(CustomSubscriberInfo *info) : data_(0),
+            conditionMutex_(NULL), conditionVariable_(NULL) {
+              // Field is not used right now
+              (void)info;
+            }
 
             void onSubscriptionMatched(Subscriber *sub, MatchingInfo &info) {
               (void)sub;
