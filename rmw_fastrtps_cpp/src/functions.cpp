@@ -853,10 +853,14 @@ fail:
             SubListener(CustomSubscriberInfo *info) : info_(info), data_(0),
             conditionMutex_(NULL), conditionVariable_(NULL) {}
 
-            void onSubscriptionMatched(Subscriber *sub, MatchingInfo &info) {}
+            void onSubscriptionMatched(Subscriber *sub, MatchingInfo &info) {
+              (void)sub;
+              (void)info;
+            }
 
             void onNewDataMessage(Subscriber *sub)
             {
+                (void)sub;
                 std::lock_guard<std::mutex> lock(internalMutex_);
 
                 if(conditionMutex_ != NULL)
@@ -917,6 +921,7 @@ fail:
     rmw_subscription_t* rmw_create_subscription(const rmw_node_t *node, const rosidl_message_type_support_t *type_support,
             const char *topic_name, const rmw_qos_profile_t * qos_policies, bool ignore_local_publications)
     {
+        (void)ignore_local_publications;
         rmw_subscription_t *subscription = nullptr;
 
         assert(node);
@@ -1228,8 +1233,8 @@ fail:
     rmw_waitset_t *
     rmw_create_waitset(size_t max_conditions)
     {
+        (void)max_conditions;
         rmw_waitset_t * waitset = rmw_waitset_allocate();
-        GuardCondition * rtps_guard_cond = nullptr;
         CustomWaitsetInfo * waitset_info = nullptr;
 
         // From here onward, error results in unrolling in the goto fail block.
@@ -2132,6 +2137,8 @@ fail:
       const rmw_node_t * node,
       rmw_topic_names_and_types_t * topic_names_and_types)
     {
+        (void)node;
+        (void)topic_names_and_types;
         RMW_SET_ERROR_MSG("not implemented");
         return RMW_RET_ERROR;
     }
@@ -2140,6 +2147,7 @@ fail:
     rmw_destroy_topic_names_and_types(
       rmw_topic_names_and_types_t * topic_names_and_types)
     {
+        (void)topic_names_and_types;
         RMW_SET_ERROR_MSG("not implemented");
         return RMW_RET_ERROR;
     }
@@ -2150,6 +2158,9 @@ fail:
       const char * topic_name,
       size_t * count)
     {
+        (void)node;
+        (void)topic_name;
+        (void)count;
         RMW_SET_ERROR_MSG("not implemented");
         return RMW_RET_ERROR;
     }
@@ -2160,6 +2171,9 @@ fail:
       const char * topic_name,
       size_t * count)
     {
+        (void)node;
+        (void)topic_name;
+        (void)count;
         RMW_SET_ERROR_MSG("not implemented");
         return RMW_RET_ERROR;
     }
@@ -2170,6 +2184,9 @@ fail:
       const rmw_client_t * client,
       bool * is_available)
     {
+        (void)node;
+        (void)client;
+        (void)is_available;
       RMW_SET_ERROR_MSG("not implemented");
       return RMW_RET_ERROR;
     }
