@@ -1,7 +1,6 @@
 #ifndef _RMW_FASTRTPS_CPP_TYPESUPPORT_H_
 #define _RMW_FASTRTPS_CPP_TYPESUPPORT_H_
 
-#include "rosidl_typesupport_introspection_cpp/service_introspection.hpp"
 #include <rosidl_generator_c/string.h>
 #include <rosidl_generator_c/string_functions.h>
 
@@ -40,6 +39,10 @@ namespace rmw_fastrtps_cpp
 
         static std::string convert_to_std_string(void *data) {
             return std::string(static_cast<rosidl_generator_c__String *>(data)->data);
+        }
+
+        static std::string convert_to_std_string(rosidl_generator_c__String & data) {
+            return std::string(data.data);
         }
 
         static void assign(eprosima::fastcdr::Cdr &deser, void *field, bool) {
