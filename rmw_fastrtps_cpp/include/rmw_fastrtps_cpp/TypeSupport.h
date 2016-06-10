@@ -58,7 +58,7 @@ namespace rmw_fastrtps_cpp
     struct StringHelper<rosidl_typesupport_introspection_cpp::MessageMembers> {
         using type = std::string;
 
-        static std::string convert_to_std_string(void *data) {
+        static std::string & convert_to_std_string(void *data) {
             return *(static_cast<std::string *>(data));
         }
 
