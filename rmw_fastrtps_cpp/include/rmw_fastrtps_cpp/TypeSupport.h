@@ -38,7 +38,16 @@ namespace rmw_fastrtps_cpp
         using type = rosidl_generator_c__String;
 
         static std::string convert_to_std_string(void *data) {
-            return std::string(static_cast<rosidl_generator_c__String *>(data)->data);
+            auto c_string = static_cast<rosidl_generator_c__String *>(data);
+            if (!c_string) {
+              fprintf(stderr, "Failed to cast data as rosidl_generator_c__String\n");
+              return "";
+            }
+            if (!c_string->data) {
+              fprintf(stderr, "rosidl_generator_c_String had invalid data\n");
+              return "";
+            }
+            return std::string(c_string->data);
         }
 
         static std::string convert_to_std_string(rosidl_generator_c__String & data) {
