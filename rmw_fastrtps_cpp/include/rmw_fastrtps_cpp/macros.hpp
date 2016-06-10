@@ -34,4 +34,3 @@
   };
 
 #endif  // MACROS_HPP_
-
