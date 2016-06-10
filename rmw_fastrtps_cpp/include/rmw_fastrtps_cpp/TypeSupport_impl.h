@@ -22,15 +22,12 @@ template<typename T>
 struct GenericCArray;
 
 // multiple definitions of ambiguous primitive types
-// SPECIALIZE_GENERIC_C_ARRAY(String, rosidl_generator_c__String)
 SPECIALIZE_GENERIC_C_ARRAY(bool, bool)
 SPECIALIZE_GENERIC_C_ARRAY(byte, uint8_t)
 SPECIALIZE_GENERIC_C_ARRAY(char, char)
 SPECIALIZE_GENERIC_C_ARRAY(float32, float)
 SPECIALIZE_GENERIC_C_ARRAY(float64, double);
 SPECIALIZE_GENERIC_C_ARRAY(int8, int8_t)
-// TODO(jacquelinekay) this results in an ambiguous definition
-// SPECIALIZE_GENERIC_C_ARRAY(uint8, uint8_t)
 SPECIALIZE_GENERIC_C_ARRAY(int16, int16_t)
 SPECIALIZE_GENERIC_C_ARRAY(uint16, uint16_t)
 SPECIALIZE_GENERIC_C_ARRAY(int32, int32_t)
@@ -245,11 +242,9 @@ void serialize_array(
     } else {
         auto & data = *reinterpret_cast<typename GenericCArray<T>::type *>(field);
         if(data.size > (member->is_upper_bound_ ? member->array_size_ : (typeTooLarge ? 30 : 101))) {
-            // TODO This exception is getting reached
             printf("vector overcomes the maximum length\n");
             throw std::runtime_error("vector overcomes the maximum length");
         }
-        //ser << data.data;
         ser.serializeArray((T*)data.data, data.size);
     }
 }
@@ -505,21 +500,6 @@ void deserialize_array(
     (void)call_new;
     if (member->array_size_ && !member->is_upper_bound_) {
         deser.deserializeArray((T*)field, member->array_size_);
-    } else {
-        // std::vector<T> &vector = *reinterpret_cast<std::vector<T> *>(field);
-        auto c_array = *reinterpret_cast<typename GenericCArray<T>::type *>(field);
-        std::vector<T> placeholder_vector;
-        // why would you do this though
-        // if(call_new)
-        // {
-        //     new(&vector) std::vector<T>;
-        // }
-        // TODO make sure data is copied...
-        deser >> placeholder_vector;
-        size_t i = 0;
-        for (const auto & entry : placeholder_vector) {
-          c_array.data[i++] = entry;
-        }
     }
 }
 
@@ -531,17 +511,9 @@ void deserialize_array<std::string>(
     eprosima::fastcdr::Cdr &deser,
     bool call_new)
 {
-  (void)call_new;
-  if (member->array_size_ && !member->is_upper_bound_) {
+    (void)call_new;
+    if (member->array_size_ && !member->is_upper_bound_) {
         deser.deserializeArray(((rosidl_generator_c__String*)field)->data, member->array_size_);
-    } else {
-        auto c_array = *reinterpret_cast<rosidl_generator_c__String__Array *>(field);
-        std::vector<std::string> placeholder_vector;
-        deser >> placeholder_vector;
-        size_t i = 0;
-        for (const auto & entry : placeholder_vector) {
-            rosidl_generator_c__String__assign(&c_array.data[i++], entry.c_str());
-        }
     }
 }
 
@@ -555,6 +527,7 @@ size_t get_submessage_array_deserialize(
     size_t max_align,
     size_t space)
 {
+    (void)member;
     uint32_t vsize = 0;
     // Deserialize length
     deser >> vsize;
