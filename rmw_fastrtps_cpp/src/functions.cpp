@@ -1916,7 +1916,28 @@ fail:
 
         Participant *participant = static_cast<Participant*>(node->data);
 
-	*count = participant->get_no_publishers(target_topic);
+	//get topic names and types for publisher
+	std::pair<StatefulReader*,StatefulReader*> EDPReaders = participant->getEDPReaders();
+	std::map<std::string,std::set<std::string>> unfiltered_topics; 
+	InfectableReaderListener* target = static_cast<InfectableReaderListener*>(EDPReaders.second->getListener()); // Second -> PubListener
+	topicnamesandtypesReaderListener* slave_target = static_cast<topicnamesandtypesReaderListener*>(target->getAttachedListener());
+	slave_target->mapmutex.lock();
+	for(auto it : slave_target->topicNtypes){
+		for(auto & itt: it.second){
+			unfiltered_topics[it.first].insert(itt);
+		}
+	}
+	slave_target->mapmutex.unlock();
+
+	
+	//get count
+	auto it = unfiltered_topics.find(topic_name);
+	if(it == unfiltered_topics.end()){
+		*count = 0;
+	}else{
+		*count = it->second.size();
+	}
+	//*count = participant->get_no_publishers(target_topic);
 
 	return RMW_RET_OK;
 
@@ -1943,8 +1964,28 @@ fail:
         }
 
         Participant *participant = static_cast<Participant*>(node->data);
+	
+	std::pair<StatefulReader*,StatefulReader*> EDPReaders = participant->getEDPReaders();
+	std::map<std::string,std::set<std::string>> unfiltered_topics; 
+	InfectableReaderListener* target = static_cast<InfectableReaderListener*>(EDPReaders.first->getListener()); //First -> Sublistener
+	topicnamesandtypesReaderListener* slave_target = static_cast<topicnamesandtypesReaderListener*>(target->getAttachedListener());
+	slave_target->mapmutex.lock();
+	for(auto it : slave_target->topicNtypes){
+		for(auto & itt: it.second){
+			unfiltered_topics[it.first].insert(itt);
+		}
+	}
+	slave_target->mapmutex.unlock();
 
-	*count = participant->get_no_subscribers(target_topic);
+	//get count
+	auto it = unfiltered_topics.find(topic_name);
+	if(it == unfiltered_topics.end()){
+		*count = 0;
+	}else{
+		*count = it->second.size();
+	}
+
+	//*count = participant->get_no_subscribers(target_topic);
 
 	return RMW_RET_OK;    }
 }
