@@ -2173,6 +2173,11 @@ fail:
                 lock.lock();
             }
         }
+        // Make timeout behavior consistent with rcl expectations for zero timeout value
+        bool hasData = check_waitset_for_data(subscriptions, guard_conditions, services, clients);
+        if (!hasData && wait_timeout && wait_timeout->sec == 0 && wait_timeout->nsec == 0) {
+         return RMW_RET_TIMEOUT;
+        }
 
         return timeout ? RMW_RET_TIMEOUT : RMW_RET_OK;
     }
