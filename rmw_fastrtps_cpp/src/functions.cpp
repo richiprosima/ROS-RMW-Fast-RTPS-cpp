@@ -1953,7 +1953,7 @@ fail:
         delete(client);
 
         return RMW_RET_OK;
-    }}
+    }
 
     // helper function for wait
     bool check_waitset_for_data(const rmw_subscriptions_t *subscriptions,
@@ -2318,4 +2318,6 @@ rmw_compare_gids_equal(const rmw_gid_t * gid1, const rmw_gid_t * gid2, bool * re
     memcmp(gid1->data, gid2->data, sizeof(eprosima::fastrtps::rtps::GUID_t)) == 0;
 
   return RMW_RET_OK;
+}
+
 }
