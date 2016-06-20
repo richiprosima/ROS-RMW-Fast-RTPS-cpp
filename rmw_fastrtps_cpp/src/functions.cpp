@@ -298,6 +298,13 @@ extern "C"
     {
         return RMW_RET_OK;
     }
+    
+    typedef struct CustomParticipantInfo
+    {
+        Participant *participant;
+    	topicnamesandtypesReaderListener *secondarySubListener;
+	topicnamesandtypesReaderListener *secondaryPubListener;
+    } CustomParticipantInfo;
 
     rmw_node_t* rmw_create_node(const char *name, size_t domain_id)
     {
@@ -314,7 +321,7 @@ extern "C"
         participantParam.rtps.setName(name);
 
         Participant *participant = Domain::createParticipant(participantParam);
-
+	CustomParticipantInfo *CustomParticipantInfo_ = new CustomParticipantInfo();
         if(!participant)
         {
             RMW_SET_ERROR_MSG("create_node() could not create participant");
@@ -328,7 +335,16 @@ extern "C"
             return NULL;
         }
         node_handle->implementation_identifier = eprosima_fastrtps_identifier;
-        node_handle->data = participant;
+        CustomParticipantInfo_->participant = participant;
+
+	//Add slave Listener to enagle get_topic_names_and_types
+        topicnamesandtypesReaderListener* tnat_1 = new topicnamesandtypesReaderListener();
+	topicnamesandtypesReaderListener* tnat_2 = new topicnamesandtypesReaderListener();
+
+	CustomParticipantInfo_->secondarySubListener = tnat_1;
+	CustomParticipantInfo_->secondaryPubListener = tnat_2;
+	
+	node_handle->data = CustomParticipantInfo_;
 
         node_handle->name =
             static_cast<const char *>(malloc(sizeof(char) * strlen(name) + 1));
@@ -338,23 +354,19 @@ extern "C"
             return NULL;
         }
         memcpy(const_cast<char *>(node_handle->name), name, strlen(name) + 1);
-	//Add slave Listener to enagle get_topic_names_and_types
-        topicnamesandtypesReaderListener* tnat_1 = new topicnamesandtypesReaderListener();
-	topicnamesandtypesReaderListener* tnat_2 = new topicnamesandtypesReaderListener();
-
+	
  	std::pair<StatefulReader*, StatefulReader*> EDPReaders = participant->getEDPReaders();
-	InfectableReaderListener* target1 = static_cast<InfectableReaderListener*>(EDPReaders.first->getListener());
-	target1->attachListener(tnat_1);
-	InfectableReaderListener* target2 = static_cast<InfectableReaderListener*>(EDPReaders.second->getListener());
-	target2->attachListener(tnat_2);
-
-	if( !( target1->hasReaderAttached() & target2->hasReaderAttached() ) ){
+		
+	if( !( EDPReaders.first->setListener(tnat_1) & EDPReaders.second->setListener(tnat_2) ) ){
 		RMW_SET_ERROR_MSG("Failed to attach ROS related logic to the Participant");
 		goto fail;	
 	}
 
         return node_handle;
     	fail:
+	delete(tnat_1);
+	delete(tnat_2);
+	delete(CustomParticipantInfo_);
 	return NULL;
 
     }
@@ -372,28 +384,23 @@ extern "C"
             return RMW_RET_ERROR;
         }
 
-        Participant *participant = static_cast<Participant*>(node->data);
+	CustomParticipantInfo *CustomParticipantInfo_ = static_cast<CustomParticipantInfo*>(node->data);
+        Participant *participant = static_cast<Participant*>(CustomParticipantInfo_->participant);
         if (!participant) {
             RMW_SET_ERROR_MSG("participant handle is null");
         }
 
 	// Dereference and delete the slave listener, in case it exists
 	std::pair<StatefulReader*,StatefulReader*> EDPReaders = participant->getEDPReaders();
-	InfectableReaderListener* target = static_cast<InfectableReaderListener*>(EDPReaders.first->getListener());
-	if(target->hasReaderAttached()){
-		ReaderListener *temp = target->getAttachedListener();
-		target->detachListener();
-		delete(temp);
-	}
-	target = static_cast<InfectableReaderListener*>(EDPReaders.second->getListener());
-	if(target->hasReaderAttached()){
-		ReaderListener *temp = target->getAttachedListener();
-		target->detachListener();
-		delete(temp);
-	}
-        Domain::removeParticipant(participant);
+	//Delete the ReaderListenersi
+	EDPReaders.first->setListener(nullptr);
+	delete(CustomParticipantInfo_->secondarySubListener);
+	EDPReaders.second->setListener(nullptr);
+	delete(CustomParticipantInfo_->secondaryPubListener);
+	 
+	Domain::removeParticipant(participant);
 
-        node->data = nullptr;
+	delete(CustomParticipantInfo_);
         if (node->name) {
             free(const_cast<char *>(node->name));
             node->name = nullptr;
@@ -426,8 +433,8 @@ extern "C"
             RMW_SET_ERROR_MSG("node handle not from this implementation");
             return NULL;
         }
-
-        Participant *participant = static_cast<Participant*>(node->data);
+	CustomParticipantInfo *CustomParticipantInfo_ = static_cast<CustomParticipantInfo*>(node->data);
+        Participant *participant = static_cast<Participant*>(CustomParticipantInfo_->participant);
 
         if(strcmp(type_support->typesupport_identifier, rosidl_typesupport_introspection_cpp::typesupport_introspection_identifier) != 0)
         {
@@ -523,7 +530,8 @@ fail:
                 Domain::removePublisher(info->publisher_);
             if(info->type_support_ != nullptr)
             {
-                Participant *participant = static_cast<Participant*>(node->data);
+                CustomParticipantInfo *CustomParticipantInfo_ = static_cast<CustomParticipantInfo*>(node->data);
+		Participant *participant = static_cast<Participant*>(CustomParticipantInfo_->participant);
                 if(Domain::unregisterType(participant, info->type_support_->getName()))
                     delete info->type_support_;
             }
@@ -660,7 +668,8 @@ fail:
             return NULL;
         }
 
-        Participant *participant = static_cast<Participant*>(node->data);
+        CustomParticipantInfo *CustomParticipantInfo_ = static_cast<CustomParticipantInfo*>(node->data);
+	Participant *participant = static_cast<Participant*>(CustomParticipantInfo_->participant);
 
         if(strcmp(type_support->typesupport_identifier, rosidl_typesupport_introspection_cpp::typesupport_introspection_identifier) != 0)
         {
@@ -748,7 +757,8 @@ fail:
                 delete info->listener_;
             if(info->type_support_ != nullptr)
             {
-                Participant *participant = static_cast<Participant*>(node->data);
+                CustomParticipantInfo *CustomParticipantInfo_ = static_cast<CustomParticipantInfo*>(node->data);
+		Participant *participant = static_cast<Participant*>(CustomParticipantInfo_->participant);
                 if(Domain::unregisterType(participant, info->type_support_->getName()))
                     delete info->type_support_;
             }
@@ -1140,7 +1150,8 @@ fail:
             return NULL;
         }
 
-        Participant *participant = static_cast<Participant*>(node->data);
+        CustomParticipantInfo *CustomParticipantInfo_ = static_cast<CustomParticipantInfo*>(node->data);
+	Participant *participant = static_cast<Participant*>(CustomParticipantInfo_->participant);
 
         if(strcmp(type_support->typesupport_identifier, rosidl_typesupport_introspection_cpp::typesupport_introspection_identifier) != 0)
         {
@@ -1229,7 +1240,8 @@ fail:
                 delete info->listener_;
             }
 
-            Participant *participant = static_cast<Participant*>(node->data);
+            CustomParticipantInfo *CustomParticipantInfo_ = static_cast<CustomParticipantInfo*>(node->data);
+	    Participant *participant = static_cast<Participant*>(CustomParticipantInfo_->participant);
             if(info->request_type_support_ != nullptr)
             {
                 if(Domain::unregisterType(participant, info->request_type_support_->getName()))
@@ -1426,7 +1438,8 @@ fail:
             return NULL;
         }
 
-        Participant *participant = static_cast<Participant*>(node->data);
+        CustomParticipantInfo *CustomParticipantInfo_ = static_cast<CustomParticipantInfo*>(node->data);
+	Participant *participant = static_cast<Participant*>(CustomParticipantInfo_->participant);
 
         if(strcmp(type_support->typesupport_identifier, rosidl_typesupport_introspection_cpp::typesupport_introspection_identifier) != 0)
         {
@@ -1801,8 +1814,9 @@ fail:
             RMW_SET_ERROR_MSG("node handle not from this implementation");
             return RMW_RET_ERROR;
         }
+	CustomParticipantInfo *CustomParticipantInfo_ = static_cast<CustomParticipantInfo*>(node->data);
 
-        Participant *participant = static_cast<Participant*>(node->data);
+        Participant *participant = static_cast<Participant*>(CustomParticipantInfo_->participant);
 
         //if(strcmp(type_support->typesupport_identifier, rosidl_typesupport_introspection_cpp::typesupport_introspection_identifier) != 0)
         //{
@@ -1815,8 +1829,7 @@ fail:
 	//Access the slave Listeners, which are the ones that have the topicnamesandtypes member
   	//Get info from publisher and subscriber
 	std::map<std::string,std::set<std::string>> unfiltered_topics; //Combined results from the two lists
-	InfectableReaderListener* target = static_cast<InfectableReaderListener*>(EDPReaders.first->getListener());
-	topicnamesandtypesReaderListener* slave_target = static_cast<topicnamesandtypesReaderListener*>(target->getAttachedListener());
+	topicnamesandtypesReaderListener* slave_target = CustomParticipantInfo_->secondarySubListener; 
 	slave_target->mapmutex.lock();
 	for(auto it : slave_target->topicNtypes){
 		for(auto & itt: it.second){
@@ -1824,8 +1837,7 @@ fail:
 		}
 	}
 	slave_target->mapmutex.unlock();
-	target = static_cast<InfectableReaderListener*>(EDPReaders.second->getListener());
- 	slave_target = static_cast<topicnamesandtypesReaderListener*>(target->getAttachedListener());
+ 	slave_target = CustomParticipantInfo_->secondaryPubListener; 
 	slave_target->mapmutex.lock();
 	for(auto it : slave_target->topicNtypes){
 		for(auto & itt: it.second){
@@ -1913,14 +1925,12 @@ fail:
             RMW_SET_ERROR_MSG("node handle not from this implementation");
             return RMW_RET_ERROR;
         }
-
-        Participant *participant = static_cast<Participant*>(node->data);
+	CustomParticipantInfo *CustomParticipantInfo_ = static_cast<CustomParticipantInfo*>(node->data);
+        Participant *participant = static_cast<Participant*>(CustomParticipantInfo_->participant);
 
 	//get topic names and types for publisher
-	std::pair<StatefulReader*,StatefulReader*> EDPReaders = participant->getEDPReaders();
 	std::map<std::string,std::set<std::string>> unfiltered_topics; 
-	InfectableReaderListener* target = static_cast<InfectableReaderListener*>(EDPReaders.second->getListener()); // Second -> PubListener
-	topicnamesandtypesReaderListener* slave_target = static_cast<topicnamesandtypesReaderListener*>(target->getAttachedListener());
+	topicnamesandtypesReaderListener* slave_target = CustomParticipantInfo_->secondaryPubListener; 
 	slave_target->mapmutex.lock();
 	for(auto it : slave_target->topicNtypes){
 		for(auto & itt: it.second){
@@ -1962,13 +1972,11 @@ fail:
             RMW_SET_ERROR_MSG("node handle not from this implementation");
             return RMW_RET_ERROR;
         }
-
-        Participant *participant = static_cast<Participant*>(node->data);
+	CustomParticipantInfo *CustomParticipantInfo_ = static_cast<CustomParticipantInfo*>(node->data);
+        Participant *participant = static_cast<Participant*>(CustomParticipantInfo_->participant);
 	
-	std::pair<StatefulReader*,StatefulReader*> EDPReaders = participant->getEDPReaders();
 	std::map<std::string,std::set<std::string>> unfiltered_topics; 
-	InfectableReaderListener* target = static_cast<InfectableReaderListener*>(EDPReaders.first->getListener()); //First -> Sublistener
-	topicnamesandtypesReaderListener* slave_target = static_cast<topicnamesandtypesReaderListener*>(target->getAttachedListener());
+	topicnamesandtypesReaderListener* slave_target = CustomParticipantInfo_->secondarySubListener; 
 	slave_target->mapmutex.lock();
 	for(auto it : slave_target->topicNtypes){
 		for(auto & itt: it.second){
