@@ -1850,6 +1850,16 @@ fail:
 	for(auto & it : unfiltered_topics){
 		if(it.second.size() == 1)	topics[it.first] = *it.second.begin();
 	}	
+	
+	std::string substring = "::msg::dds_::";
+	for (auto & it : topics) {
+	       size_t substring_position = it.second.find(substring);
+	       if(it.second[it.second.size()-1] == '_' && substring_position != std::string::npos){
+		       it.second = it.second.substr(0,substring_position) + "/" + it.second.substr(substring_position + substring.size(), it.second.size() - substring_position -substring.size() -1);
+		}
+	}
+
+
 	//Copy data to results handle
 	if(topics.size() > 0){
 		//Alloc memory for pointers to instances
