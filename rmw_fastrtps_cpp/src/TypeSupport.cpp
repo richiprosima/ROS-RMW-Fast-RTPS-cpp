@@ -22,7 +22,7 @@ static inline void*
 align_(size_t __align, size_t __size, void*& __ptr, size_t& __space) noexcept
 {
     const auto __intptr = reinterpret_cast<uintptr_t>(__ptr);
-    const auto __aligned = (__intptr - 1u + __align) & -__align;
+    const auto __aligned = (__intptr - 1u + __align) & ~(__align - 1);
     const auto __diff = __aligned - __intptr;
     if ((__size + __diff) > __space)
         return nullptr;
@@ -202,8 +202,10 @@ bool TypeSupport::serializeROSmessage(eprosima::fastcdr::Cdr &ser, const rosidl_
             {
                 case ::rosidl_typesupport_introspection_cpp::ROS_TYPE_BOOL:
                     {
-                        bool sb = false, &b = *(bool*)field;
-                        if(b) sb = true; 
+                        bool sb = false;
+                        // don't cast to bool here because if the bool is
+                        // uninitialized the random value can't be deserialized
+                        if(*(uint8_t*)field) sb = true;
                         ser << sb;
                     }
                     break;
@@ -246,7 +248,7 @@ bool TypeSupport::serializeROSmessage(eprosima::fastcdr::Cdr &ser, const rosidl_
                         // Control maximum length.
                         if((member->string_upper_bound_ && str.length() > member->string_upper_bound_ + 1) || str.length() > 256)
                         {
-                            printf("string overcomes the maximum length with length %lu\n", str.length());
+                            printf("string overcomes the maximum length with length %zu\n", str.length());
                             throw std::runtime_error("string overcomes the maximum length");
                         }
                         ser << str;

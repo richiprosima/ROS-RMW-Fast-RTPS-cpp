@@ -178,6 +178,7 @@ class ClientListener : public SubscriberListener
         std::condition_variable *conditionVariable_;
 };
 
+
 extern "C"
 {
     const char* const eprosima_fastrtps_identifier = "fastrtps";
@@ -304,6 +305,8 @@ extern "C"
         Participant *participant;
     	topicnamesandtypesReaderListener *secondarySubListener;
 	topicnamesandtypesReaderListener *secondaryPubListener;
+    	rmw_guard_condition_t * graph_guard_condition;
+
     } CustomParticipantInfo;
 
     rmw_node_t* rmw_create_node(const char *name, size_t domain_id)
@@ -313,7 +316,7 @@ extern "C"
             return NULL;
         }
 
-	eprosima::Log::setVerbosity(eprosima::VERB_ERROR);
+        eprosima::Log::setVerbosity(eprosima::VERB_ERROR);
 
         ParticipantAttributes participantParam;
         participantParam.rtps.builtin.domainId = domain_id;
@@ -325,6 +328,12 @@ extern "C"
         if(!participant)
         {
             RMW_SET_ERROR_MSG("create_node() could not create participant");
+            return NULL;
+        }
+
+        rmw_guard_condition_t * graph_guard_condition = rmw_create_guard_condition();
+        if (!graph_guard_condition) {
+            // error already set
             return NULL;
         }
 
@@ -344,6 +353,7 @@ extern "C"
 	CustomParticipantInfo_->secondarySubListener = tnat_1;
 	CustomParticipantInfo_->secondaryPubListener = tnat_2;
 	
+        CustomParticipantInfo_->graph_guard_condition = graph_guard_condition;
 	node_handle->data = CustomParticipantInfo_;
 
         node_handle->name =
@@ -388,6 +398,11 @@ extern "C"
         Participant *participant = static_cast<Participant*>(CustomParticipantInfo_->participant);
         if (!participant) {
             RMW_SET_ERROR_MSG("participant handle is null");
+	    return RMW_RET_ERROR;
+	}
+        if (RMW_RET_OK != rmw_destroy_guard_condition(CustomParticipantInfo_->graph_guard_condition)) {
+            RMW_SET_ERROR_MSG("failed to destroy graph guard condition");
+            return RMW_RET_ERROR;
         }
 
 	// Dereference and delete the slave listener, in case it exists
@@ -401,11 +416,6 @@ extern "C"
 	Domain::removeParticipant(participant);
 
 	delete(CustomParticipantInfo_);
-        if (node->name) {
-            free(const_cast<char *>(node->name));
-            node->name = nullptr;
-        }
-        free(static_cast<void*>(node));
 
         return RMW_RET_OK;
     }
@@ -435,6 +445,7 @@ extern "C"
         }
 	CustomParticipantInfo *CustomParticipantInfo_ = static_cast<CustomParticipantInfo*>(node->data);
         Participant *participant = static_cast<Participant*>(CustomParticipantInfo_->participant);
+
 
         if(strcmp(type_support->typesupport_identifier, rosidl_typesupport_introspection_cpp::typesupport_introspection_identifier) != 0)
         {
@@ -1248,14 +1259,17 @@ fail:
                     delete info->request_type_support_;
             }
 
-            if(info->response_type_support_ != nullptr)
-            {
-                if(Domain::unregisterType(participant, info->response_type_support_->getName()))
-                    delete info->response_type_support_;
+                if(info->response_type_support_ != nullptr)
+                {
+                    if(Domain::unregisterType(participant, info->response_type_support_->getName()))
+                        delete info->response_type_support_;
+                }
+            } else {
+                fprintf(stderr,
+                    "[rmw_fastrtps] leaking type support objects because node impl is null\n");
             }
 
             delete info;
-        }
 
         return NULL;
     }
@@ -2006,7 +2020,28 @@ fail:
 	//*count = participant->get_no_subscribers(target_topic);
 
 	return RMW_RET_OK;    }
-}
+
+    rmw_ret_t
+    rmw_service_server_is_available(
+      const rmw_node_t * node,
+      const rmw_client_t * client,
+      bool * is_available)
+    {
+      RMW_SET_ERROR_MSG("not implemented");
+      return RMW_RET_ERROR;
+    }
+
+    const rmw_guard_condition_t *
+    rmw_node_get_graph_guard_condition(const rmw_node_t * node)
+    {
+      // TODO(wjwwood): actually use the graph guard condition and notify it when changes happen.
+      CustomParticipantInfo *CustomParticipantInfo_ = static_cast<CustomParticipantInfo*>(node->data); 
+      if (!CustomParticipantInfo_) {
+        RMW_SET_ERROR_MSG("node impl is null");
+        return NULL;
+      }
+      return CustomParticipantInfo_->graph_guard_condition;
+    }
 
 rmw_ret_t
 rmw_get_gid_for_publisher(const rmw_publisher_t * publisher, rmw_gid_t * gid)
@@ -2077,4 +2112,5 @@ rmw_compare_gids_equal(const rmw_gid_t * gid1, const rmw_gid_t * gid2, bool * re
     memcmp(gid1->data, gid2->data, sizeof(eprosima::fastrtps::rtps::GUID_t)) == 0;
 
   return RMW_RET_OK;
-}
+}}
+
